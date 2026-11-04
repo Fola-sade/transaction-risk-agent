@@ -1,0 +1,324 @@
+{
+  "name": "Transaction Risk Analyst Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cad1f21d-a472-46ed-97d5-c9454a61fec6",
+      "name": "When chat message received",
+      "webhookId": "24637417-28da-4c27-83c7-150a8d2156c1"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a Transaction Risk Analyst for a Nigerian bank. You review one transaction at a time and score how risky it is.\n\nINPUT\nThe user gives: customer_id, amount (NGN), time (24h HH:MM), channel, and new beneficiary (yes/no).\nIf any of these is missing, ask for it. Never guess a value.\n\nPROCESS - always in this order\n1. Call get_customer_profile with the customer_id. If no customer is found, say so and stop.\n2. Call get_rules.\n3. Check every rule against the transaction and the profile. Use only data from the tools and the user's message. Clarifications:\n   - \"5x the average\" means amount > 5 * avg_txn_amount.\n   - \"Between 00:00 and 04:00\" means the time is from 00:00 up to 03:59.\n   - usual_channels can hold several channels separated by \";\". Compare without caring about upper/lower case.\n   - \"Round number\" means amount is exactly divisible by 100000 AND amount >= 500000.\n   - R3 is a fixed night window for every customer. Do not describe it as \"outside usual hours\" and do not mention the customer's usual_hours when explaining R3.\n   - If the customer is not found, return \"score\": null, \"triggered_rules\": [], \"logged\": false, and say the transaction could not be assessed. Never return 0 for an unassessed transaction.\n4. Score = sum of the weights of the rules that fired. Maximum 100.\n5. If score >= 60, call log_flag exactly once with customer_id, amount, score, and reasons (the fired rule_ids with a short reason each, e.g. \"R1: 12x average; R3: 02:30\"). If score < 60, do NOT call log_flag.\n\nOUTPUT\nYou only have three tools: get_customer_profile, get_rules and log_flag. There is no \"json\" tool or any other tool.\nWhen you are done calling tools, write your final answer as a normal text message (not a tool call). The message must contain only this JSON object, with nothing before or after it:\n{\n  \"customer_id\": \"...\",\n  \"score\": 0,\n  \"triggered_rules\": [\"R1\", \"...\"],\n  \"explanation\": \"2-3 plain-English sentences an analyst can act on, mentioning the actual numbers.\",\n  \"logged\": true or false\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "bd2e62bb-d924-4a19-a61d-ee68583631dc",
+      "name": "AI Agent",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        208
+      ],
+      "id": "1109323c-0e5f-4faf-9632-c6be8355f4f1",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "cuWiEuLwD5LofdTH",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -16,
+        224
+      ],
+      "id": "71f54456-5e92-4763-ab9e-ec2919e6e988",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Looks up one customer's normal behaviour (average transaction amount, usual channels, usual hours, account age). Input: the customer_id, e.g. C001.",
+        "documentId": {
+          "__rl": true,
+          "value": "16YYJhQfs9fKXApOf-5CrqMXFO7EKtpsFvjXqyOEyY3w",
+          "mode": "list",
+          "cachedResultName": "Risk Agent",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16YYJhQfs9fKXApOf-5CrqMXFO7EKtpsFvjXqyOEyY3w/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1618070334,
+          "mode": "list",
+          "cachedResultName": "Customers",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16YYJhQfs9fKXApOf-5CrqMXFO7EKtpsFvjXqyOEyY3w/edit#gid=1618070334"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "customer_id",
+              "lookupValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('values0_Value', `The customer ID, e.g. C001`, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        160,
+        240
+      ],
+      "id": "ca93febf-f786-4dfa-ab4e-501dd0f09149",
+      "name": "get_customer_profile",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wVCQsOfzYkLiixfR",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Returns all fraud-risk rules with their rule_id, description and weight. Takes no input.",
+        "documentId": {
+          "__rl": true,
+          "value": "16YYJhQfs9fKXApOf-5CrqMXFO7EKtpsFvjXqyOEyY3w",
+          "mode": "list",
+          "cachedResultName": "Risk Agent",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16YYJhQfs9fKXApOf-5CrqMXFO7EKtpsFvjXqyOEyY3w/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 33928235,
+          "mode": "list",
+          "cachedResultName": "Rules",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16YYJhQfs9fKXApOf-5CrqMXFO7EKtpsFvjXqyOEyY3w/edit#gid=33928235"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        336,
+        240
+      ],
+      "id": "c9a09108-45fc-46bd-93b1-510cdc4ebd07",
+      "name": "get_rules",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wVCQsOfzYkLiixfR",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Saves a high-risk transaction to the Flagged sheet. Only use when the score is 60 or higher.",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "16YYJhQfs9fKXApOf-5CrqMXFO7EKtpsFvjXqyOEyY3w",
+          "mode": "list",
+          "cachedResultName": "Risk Agent",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16YYJhQfs9fKXApOf-5CrqMXFO7EKtpsFvjXqyOEyY3w/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 386224785,
+          "mode": "list",
+          "cachedResultName": "Flagged",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16YYJhQfs9fKXApOf-5CrqMXFO7EKtpsFvjXqyOEyY3w/edit#gid=386224785"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}",
+            "customer_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('customer_id', `The customer ID, e.g. C005`, 'string') }}",
+            "amount": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('amount', `Transaction amount in NGN, numbers only`, 'string') }}",
+            "score": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('score', `Risk score 0-100, number only`, 'string') }}",
+            "reasons": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('reasons', `Fired rule IDs with a short reason each, e.g. \"R1: 12x average; R3: 02:30\"`, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "amount",
+              "displayName": "amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reasons",
+              "displayName": "reasons",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        512,
+        240
+      ],
+      "id": "ef7154a1-0651-483e-92f5-e989b0161e1d",
+      "name": "log_flag",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wVCQsOfzYkLiixfR",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_customer_profile": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_rules": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log_flag": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ec3bdbb1-8e20-4f28-a08c-77b599cf138a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4a009606660eebeec4f5b6020833d8540d20c17bd92f7b81b2abe97313a00a52"
+  },
+  "nodeGroups": [],
+  "id": "TcIGoT5ncKk31mbq",
+  "tags": []
+}
