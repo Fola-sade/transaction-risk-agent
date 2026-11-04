@@ -40,7 +40,7 @@ Score = sum of the weights of the rules that fired, capped at 100.
   "customer_id": "C006",
   "score": 75,
   "triggered_rules": ["R1", "R3", "R4", "R6"],
-  "explanation": "The transaction amount of 700,000 NGN is 11.7 times the customer's average of 60,000 NGN (R1). It occurs at 00:30 (R3) via USSD, which is not among the customer's usual mobile app channel (R4), and the amount is a round 700k (R6).",
+  "explanation": "The transaction amount of 700,000 NGN is 11.7 times the customer's average of 60,000 NGN (R1). It occurs at 00:30 (R3) via USSD, which is not among the customer's usual mobile app channels (R4), and the amount is a round 700k (R6).",
   "logged": true
 }
 ```
